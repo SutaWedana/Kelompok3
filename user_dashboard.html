@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <link rel="stylesheet" href="user.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.5.0/font/bootstrap-icons.min.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <a href="index.html" class="logout">Logout</a>
+        <h2>Welcome to the User Dashboard</h2>
+        <p>You have successfully logged in as User.</p>
+
+        <input type="text" id="search" placeholder="Search Inventory..." onkeyup="searchTable()">
+        <h3>Data Inventaris Barang</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Barang</th>
+                    <th>Nama Barang</th>
+                    <th>Stok</th>
+                    <th>Harga</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="inventoryTable">
+                <tr class="no-data" id="noDataRow">
+                    <td colspan="5">No data available</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+
+    <div class="cart-icon" onclick="toggleCart()">
+        <i class="bi bi-cart"></i>
+        <div class="cart-counter" id="cartCounter">0</div>
+    </div>
+
+    <div class="cart-container" id="cartContainer">
+        <h3>Keranjang Belanja</h3>
+        <ul id="cartItems"></ul>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            loadTableData();
+            updateCartCounter();
+            updateCart();
+        });
+
+        function loadTableData() {
+            const data = localStorage.getItem('inventoryData');
+            const noDataRow = document.getElementById('noDataRow');
+            if (data) {
+                const inventory = JSON.parse(data);
+                const table = document.getElementById('inventoryTable');
+
+                table.innerHTML = ''; // Clear the table
+
+                if (inventory.length === 0) {
+                    noDataRow.style.display = 'table-row'; // Show 'No data available' row
+                } else {
+                    noDataRow.style.display = 'none'; // Hide 'No data available' row
+                    inventory.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.id}</td>
+                            <td>${item.name}</td>
+                            <td>${item.stock}</td>
+                            <td>Rp ${item.price.toLocaleString('id-ID')}</td>
+                            <td><button class="btn btn-success" onclick="addToCart('${item.id}', '${item.name}', ${item.price})">Beli</button></td>
+                        `;
+                        table.appendChild(row);
+                    });
+                }
+            } else {
+                noDataRow.style.display = 'table-row'; // Show 'No data available' row if no data
+            }
+        }
+
+        function searchTable() {
+            const input = document.getElementById('search');
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById('inventoryTable');
+            const tr = table.getElementsByTagName('tr');
+            const noDataRow = document.getElementById('noDataRow');
+
+            let hasVisibleRows = false;
+
+            for (let i = 0; i < tr.length; i++) {
+                const id = tr[i].getElementsByTagName('td')[0]?.textContent.toLowerCase() || '';
+                const name = tr[i].getElementsByTagName('td')[1]?.textContent.toLowerCase() || '';
+                if (id.indexOf(filter) > -1 || name.indexOf(filter) > -1) {
+                    tr[i].style.display = '';
+                    hasVisibleRows = true;
+                } else {
+                    tr[i].style.display = 'none';
+                }
+            }
+
+            noDataRow.style.display = hasVisibleRows ? 'none' : 'table-row';
+        }
+
+        function toggleCart() {
+            const cartContainer = document.getElementById('cartContainer');
+            cartContainer.style.display = cartContainer.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function addToCart(id, name, price) {
+            const cartItems = JSON.parse(localStorage.getItem('cartItems')) || [];
+            cartItems.push({ id, name, price });
+            localStorage.setItem('cartItems', JSON.stringify(cartItems));
+            updateCartCounter();
+            updateCart();
+            notifyAdmin(id, name, price); // Notify the admin
+        }
+
+        function notifyAdmin(id, name, price) {
+            const notifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+            notifications.push({ id, name, price });
+            localStorage.setItem('adminNotifications', JSON.stringify(notifications));
+        }
+
+        function removeFromCart(index) {
+            const cartItems = JSON.parse(localStorage.getItem('cartItems')) || [];
+            cartItems.splice(index, 1);
+            localStorage.setItem('cartItems', JSON.stringify(cartItems));
+            updateCartCounter();
+            updateCart();
+        }
+
+        function updateCartCounter() {
+            const cartItems = JSON.parse(localStorage.getItem('cartItems')) || [];
+            document.getElementById('cartCounter').textContent = cartItems.length;
+        }
+
+        function updateCart() {
+            const cartItems = JSON.parse(localStorage.getItem('cartItems')) || [];
+            const cartItemsContainer = document.getElementById('cartItems');
+            cartItemsContainer.innerHTML = '';
+            cartItems.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.innerHTML = `${item.name} - Rp ${item.price.toLocaleString('id-ID')}
+                                <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})">Hapus</button>`;
+                cartItemsContainer.appendChild(li);
+            });
+        }
+    </script>
+</body>
+</html>

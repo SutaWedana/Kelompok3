@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <div class="dashboard-container admin">
+        <h2>Welcome to the Admin Dashboard</h2>
+        <p>You have successfully logged in as Admin.</p>
+
+        <div class="add-item-form">
+            <h3>Add New Item</h3>
+            <form id="addItemForm">
+                <input type="text" id="itemId" placeholder="ID Barang" required>
+                <input type="text" id="itemName" placeholder="Nama Barang" required>
+                <input type="number" id="itemStock" placeholder="Stok" required>
+                <input type="number" id="itemPrice" placeholder="Harga" required>
+                <button type="submit">Add Item</button>
+            </form>
+            <button id="clearData">Clear Data</button>
+        </div>
+
+        <input type="text" id="search" placeholder="Search Inventory..." onkeyup="searchTable()">
+        <h3>Data Inventaris Barang</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Barang</th>
+                    <th>Nama Barang</th>
+                    <th>Stok</th>
+                    <th>Harga</th>
+                    <th class="edit">Edit</th>
+                </tr>
+            </thead>
+            <tbody id="inventoryTable">
+                <tr class="no-data" id="noDataRow">
+                    <td colspan="5">No data available</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="notifications-container">
+            <h3>Pesanan Masuk</h3>
+            <table id="notificationsTable">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Item Name</th>
+                        <th>Price</th>
+                    </tr>
+                </thead>
+                <tbody id="notificationsList">
+                    <tr class="no-data">
+                        <td colspan="4">No new orders.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <a href="index.html" class="logout">Logout</a>
+        <br><br>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            loadTableData();
+            loadNotifications();
+    
+            document.getElementById('addItemForm').addEventListener('submit', function(event) {
+                event.preventDefault();
+                addItem();
+            });
+    
+            document.getElementById('clearData').addEventListener('click', function() {
+                clearData();
+            });
+    
+            setInterval(loadNotifications, 5000); // Check for new notifications every 5 seconds
+        });
+
+        function addItem() {
+            const id = document.getElementById('itemId').value;
+            const name = document.getElementById('itemName').value;
+            const stock = document.getElementById('itemStock').value;
+            const price = document.getElementById('itemPrice').value;
+            if (id && name && stock && price) {
+                const data = JSON.parse(localStorage.getItem('inventoryData') || '[]');
+                if (data.some(item => item.id === id)) {
+                    alert('ID Barang already exists.');
+                    return;
+                }
+    
+                const item = {
+                    id: id,
+                    name: name,
+                    stock: stock,
+                    price: price
+                };
+                data.push(item);
+                localStorage.setItem('inventoryData', JSON.stringify(data));
+    
+                const table = document.getElementById('inventoryTable');
+                const noDataRow = document.getElementById('noDataRow');
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.id}</td>
+                    <td>${item.name}</td>
+                    <td>${item.stock}</td>
+                    <td>${formatPrice(item.price)}</td>
+                    <td class="edit"><button class="edit-btn" onclick="editItem('${item.id}')">Edit</button></td>
+                `;
+                table.appendChild(row);
+                noDataRow.style.display = 'none'; // Hide 'No data available' row
+                document.getElementById('addItemForm').reset(); // Clear the form
+            } else {
+                alert('Please fill out all fields.');
+            }
+        }
+    
+        function formatPrice(price) {
+            return `Rp ${parseInt(price).toLocaleString('id-ID')}`;
+        }
+    
+        function saveTableData() {
+            const table = document.getElementById('inventoryTable');
+            const rows = table.getElementsByTagName('tr');
+            let data = [];
+    
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                if (cells.length > 0 && cells[0].textContent.trim() !== '') {
+                    data.push({
+                        id: cells[0].textContent,
+                        name: cells[1].textContent,
+                        stock: cells[2].textContent,
+                        price: cells[3].textContent.replace('Rp ', '').replace(',', '')
+                    });
+                }
+            }
+    
+            localStorage.setItem('inventoryData', JSON.stringify(data));
+        }
+    
+        function loadTableData() {
+            const data = localStorage.getItem('inventoryData');
+            const noDataRow = document.getElementById('noDataRow');
+            if (data) {
+                const inventory = JSON.parse(data);
+                const table = document.getElementById('inventoryTable');
+    
+                table.innerHTML = ''; // Clear the table
+    
+                if (inventory.length === 0) {
+                    noDataRow.style.display = 'table-row'; // Show 'No data available' row
+                } else {
+                    noDataRow.style.display = 'none'; // Hide 'No data available' row
+                    inventory.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.id}</td>
+                            <td>${item.name}</td>
+                            <td>${item.stock}</td>
+                            <td>${formatPrice(item.price)}</td>
+                            <td class="edit"><button class="edit-btn" onclick="editItem('${item.id}')">Edit</button></td>
+                        `;
+                        table.appendChild(row);
+                    });
+                }
+            } else {
+                noDataRow.style.display = 'table-row'; // Show 'No data available' row if no data
+            }
+        }
+    
+        function searchTable() {
+            const input = document.getElementById('search');
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById('inventoryTable');
+            const tr = table.getElementsByTagName('tr');
+            const noDataRow = document.getElementById('noDataRow');
+    
+            let hasVisibleRows = false;
+    
+            for (let i = 0; i < tr.length; i++) {
+                const id = tr[i].getElementsByTagName('td')[0]?.textContent.toLowerCase() || '';
+                const name = tr[i].getElementsByTagName('td')[1]?.textContent.toLowerCase() || '';
+                if (id.indexOf(filter) > -1 || name.indexOf(filter) > -1) {
+                    tr[i].style.display = '';
+                    hasVisibleRows = true;
+                } else {
+                    tr[i].style.display = 'none';
+                }
+            }
+    
+            noDataRow.style.display = hasVisibleRows ? 'none' : 'table-row';
+        }
+    
+        function clearData() {
+            localStorage.removeItem('inventoryData');
+            const table = document.getElementById('inventoryTable');
+            table.innerHTML = `
+                <tr class="no-data" id="noDataRow">
+                    <td colspan="5">No data available</td>
+                </tr>
+            `;
+            alert('All data has been cleared.');
+        }
+    
+        function loadNotifications() {
+            const notifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+            const notificationsTable = document.getElementById('notificationsTable');
+            const noDataRow = notificationsTable.querySelector('.no-data');
+    
+            if (notifications.length === 0) {
+                noDataRow.style.display = 'table-row';
+                noDataRow.innerHTML = '<td colspan="4">No new orders.</td>';
+            } else {
+                noDataRow.style.display = 'none';
+                const tbody = notificationsTable.querySelector('tbody');
+                tbody.innerHTML = ''; // Clear previous rows
+    
+                notifications.forEach((notification, index) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${notification.id}</td>
+                        <td>${notification.name}</td>
+                        <td>${formatPrice(notification.price)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        }
+    
+        function removeNotification(index) {
+            const notifications = JSON.parse(localStorage.getItem('adminNotifications')) || [];
+            if (index >= 0 && index < notifications.length) {
+                const notification = notifications[index];
+                notifications.splice(index, 1);
+                localStorage.setItem('adminNotifications', JSON.stringify(notifications));
+    
+                // Remove from cart on the user's side
+                removeFromCartById(notification.id);
+    
+                loadNotifications(); // Refresh the notifications list
+            } else {
+                console.error('Invalid notification index:', index);
+            }
+        }
+    
+        function removeFromCartById(id) {
+            const cartItems = JSON.parse(localStorage.getItem('cartItems')) || [];
+            const updatedCartItems = cartItems.filter(item => item.id !== id);
+            localStorage.setItem('cartItems', JSON.stringify(updatedCartItems));
+            // Update cart counter and display
+            updateCartCounter();
+            updateCart();
+        }
+
+        function editItem(itemId) {
+            const data = JSON.parse(localStorage.getItem('inventoryData') || '[]');
+            const item = data.find(i => i.id === itemId);
+            
+            if (item) {
+                // Fill the form with the item's data for editing
+                document.getElementById('itemId').value = item.id;
+                document.getElementById('itemName').value = item.name;
+                document.getElementById('itemStock').value = item.stock;
+                document.getElementById('itemPrice').value = item.price;
+
+                // Change the button text to "Update Item" and add an event listener
+                const submitButton = document.querySelector('#addItemForm button[type="submit"]');
+                submitButton.textContent = 'Update Item';
+                submitButton.onclick = function() {
+                    updateItem(itemId);
+                };
+            } else {
+                alert('Item not found.');
+            }
+        }
+
+        function updateItem(originalId) {
+            const id = document.getElementById('itemId').value;
+            const name = document.getElementById('itemName').value;
+            const stock = document.getElementById('itemStock').value;
+            const price = document.getElementById('itemPrice').value;
+
+            if (id && name && stock && price) {
+                let data = JSON.parse(localStorage.getItem('inventoryData') || '[]');
+                const index = data.findIndex(item => item.id === originalId);
+
+                if (index !== -1) {
+                    data[index] = {
+                        id: id,
+                        name: name,
+                        stock: stock,
+                        price: price
+                    };
+                    localStorage.setItem('inventoryData', JSON.stringify(data));
+    
+                    // Update the table
+                    loadTableData();
+    
+                    // Reset the form
+                    document.getElementById('addItemForm').reset();
+                    document.querySelector('#addItemForm button[type="submit"]').textContent = 'Add Item';
+                } else {
+                    alert('Item not found.');
+                }
+            } else {
+                alert('Please fill out all fields.');
+            }
+        }
+    </script>
+</body>
+</html>
